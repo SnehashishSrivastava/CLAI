@@ -279,59 +279,81 @@ class SandboxSession:
         if not self.state or not self.state.is_active:
             return []
         
+        if not self.state.sandbox_dir.exists():
+            return []
+        
         changes = []
         
         # Get all files in both directories
         original_files = set()
         sandbox_files = set()
         
-        for f in self.original_dir.rglob("*"):
-            if f.is_file() and not self._should_ignore(f):
-                rel = f.relative_to(self.original_dir)
-                original_files.add(str(rel))
+        # Scan original directory
+        if self.original_dir.exists():
+            for f in self.original_dir.rglob("*"):
+                try:
+                    if f.is_file() and not self._should_ignore(f):
+                        rel = f.relative_to(self.original_dir)
+                        # Normalize path separators
+                        original_files.add(str(rel).replace("\\", "/"))
+                except Exception:
+                    pass
         
+        # Scan sandbox directory
         for f in self.state.sandbox_dir.rglob("*"):
-            if f.is_file() and not self._should_ignore(f):
-                rel = f.relative_to(self.state.sandbox_dir)
-                sandbox_files.add(str(rel))
+            try:
+                if f.is_file() and not self._should_ignore(f):
+                    rel = f.relative_to(self.state.sandbox_dir)
+                    # Normalize path separators
+                    sandbox_files.add(str(rel).replace("\\", "/"))
+            except Exception:
+                pass
         
-        # Find added files
-        for f in sandbox_files - original_files:
+        # Find added files (in sandbox but not in original)
+        added = sandbox_files - original_files
+        for f in added:
             changes.append(FileChange(path=f, change_type="added"))
         
-        # Find deleted files
-        for f in original_files - sandbox_files:
+        # Find deleted files (in original but not in sandbox)
+        deleted = original_files - sandbox_files
+        for f in deleted:
             changes.append(FileChange(path=f, change_type="deleted"))
         
-        # Find modified files
-        for f in original_files & sandbox_files:
-            orig_path = self.original_dir / f
-            sand_path = self.state.sandbox_dir / f
+        # Find modified files (in both, compare content)
+        common = original_files & sandbox_files
+        for f in common:
+            # Use forward slashes for path construction
+            orig_path = self.original_dir / f.replace("/", os.sep)
+            sand_path = self.state.sandbox_dir / f.replace("/", os.sep)
             
-            if not filecmp.cmp(orig_path, sand_path, shallow=False):
-                # Generate diff for text files
-                diff_lines = None
-                try:
-                    with open(orig_path, 'r', encoding='utf-8') as fo:
-                        orig_lines = fo.readlines()
-                    with open(sand_path, 'r', encoding='utf-8') as fs:
-                        sand_lines = fs.readlines()
-                    
-                    diff = list(difflib.unified_diff(
-                        orig_lines, sand_lines,
-                        fromfile=f"original/{f}",
-                        tofile=f"sandbox/{f}",
-                        lineterm=""
-                    ))
-                    diff_lines = diff[:100]  # Limit diff size
-                except:
-                    pass  # Binary file or encoding issue
-                
-                changes.append(FileChange(
-                    path=f, 
-                    change_type="modified",
-                    diff_lines=diff_lines
-                ))
+            try:
+                if orig_path.exists() and sand_path.exists():
+                    if not filecmp.cmp(str(orig_path), str(sand_path), shallow=False):
+                        # Generate diff for text files
+                        diff_lines = None
+                        try:
+                            with open(orig_path, 'r', encoding='utf-8') as fo:
+                                orig_lines = fo.readlines()
+                            with open(sand_path, 'r', encoding='utf-8') as fs:
+                                sand_lines = fs.readlines()
+                            
+                            diff = list(difflib.unified_diff(
+                                orig_lines, sand_lines,
+                                fromfile=f"original/{f}",
+                                tofile=f"sandbox/{f}",
+                                lineterm=""
+                            ))
+                            diff_lines = diff[:100]  # Limit diff size
+                        except:
+                            pass  # Binary file or encoding issue
+                        
+                        changes.append(FileChange(
+                            path=f, 
+                            change_type="modified",
+                            diff_lines=diff_lines
+                        ))
+            except Exception:
+                pass
         
         return changes
     

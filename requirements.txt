@@ -1,0 +1,15 @@
+# CLAI - Command Line AI Assistant
+# Python dependencies for containerization
+
+# Core HTTP/API
+requests>=2.31.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# OpenAI SDK (optional, for OpenAI adapter)
+openai>=1.40.0
+
+# Type hints backport (for Python <3.10)
+typing-extensions>=4.0.0
+

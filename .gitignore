@@ -1,1 +1,36 @@
+# Environment and secrets
 .env
+secrets*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+clai_env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+CLAI_logs.txt
+last_runner_payload.json
+
+# Sandbox directories
+.clai_sandbox_*
+
+# OS
+.DS_Store
+Thumbs.db
