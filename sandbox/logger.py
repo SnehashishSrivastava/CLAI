@@ -82,14 +82,13 @@ class CLAILogger:
         Initialize logger.
         
         Args:
-            log_dir: Directory for log file. Defaults to parent of CLAI module.
+            log_dir: Directory for log file. Defaults to current working directory.
             log_file: Name of log file.
             json_mode: If True, log as JSON lines. If False, human-readable.
         """
         if log_dir is None:
-            # Default to parent directory of CLAI package
-            clai_dir = Path(__file__).resolve().parent.parent.parent
-            log_dir = str(clai_dir)
+            # Default to current working directory (where CLAI is being used)
+            log_dir = str(Path.cwd())
         
         self.log_dir = Path(log_dir)
         self.log_file = log_file

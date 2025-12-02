@@ -14,6 +14,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, field
 
+from .logger import CLAILogger
+
 
 @dataclass
 class CommandResult:
@@ -77,6 +79,8 @@ class SandboxSession:
             'node_modules', '.venv', 'venv', 'clai_env', '*.egg-info',
             'CLAI_logs.txt', 'last_runner_payload.json'  # Don't copy logs/temp files
         ]
+        # Initialize logger to use the work directory
+        self.logger = CLAILogger(log_dir=str(self.original_dir))
     
     def _generate_session_id(self) -> str:
         """Generate unique session ID."""
@@ -177,7 +181,7 @@ class SandboxSession:
         
         return command
     
-    def run_command(self, command: List[str], cwd: str = ".") -> CommandResult:
+    def run_command(self, command: List[str], cwd: str = ".", log: bool = True) -> CommandResult:
         """
         Execute a command in the sandbox.
         
@@ -245,6 +249,28 @@ class SandboxSession:
         
         self.state.command_history.append(cmd_result)
         
+        # Log the command execution (if not already logged by run_plan)
+        # This handles direct command calls
+        if log and hasattr(self, 'logger') and self.state:
+            # Create a plan-like dict for logging
+            plan_dict = {
+                "version": "1.0",
+                "intent": "direct_command",
+                "command": command,
+                "cwd": str(exec_dir.relative_to(self.state.sandbox_dir)) if self.state else ".",
+            }
+            self.logger.log_command(
+                user_query=f"Direct command: {' '.join(command)}",
+                plan=plan_dict,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                duration_ms=duration_ms,
+                sandbox_mode="sandbox",
+                approved=True,
+                error=stderr if exit_code != 0 else None
+            )
+        
         # Show result
         if cmd_result.success:
             print(f"✅ Command succeeded (exit: 0)")
@@ -258,16 +284,34 @@ class SandboxSession:
         
         return cmd_result
     
-    def run_plan(self, plan: Dict[str, Any]) -> CommandResult:
+    def run_plan(self, plan: Dict[str, Any], user_query: Optional[str] = None) -> CommandResult:
         """
         Execute a plan from the LLM.
         
         Args:
             plan: Plan dict with 'command' and 'cwd' keys.
+            user_query: Original user query (for logging).
         """
         command = plan.get("command", [])
         cwd = plan.get("cwd", ".")
-        return self.run_command(command, cwd)
+        # Don't log in run_command, we'll log here with the plan
+        result = self.run_command(command, cwd, log=False)
+        
+        # Log the command execution with user query if available
+        if hasattr(self, 'logger') and self.state:
+            self.logger.log_command(
+                user_query=user_query or f"Command: {' '.join(command)}",
+                plan=plan,
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                duration_ms=result.duration_ms,
+                sandbox_mode="sandbox",
+                approved=True,
+                error=result.stderr if not result.success else None
+            )
+        
+        return result
     
     def get_changes(self) -> List[FileChange]:
         """

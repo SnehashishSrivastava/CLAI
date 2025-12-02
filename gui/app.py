@@ -873,11 +873,11 @@ class CLAIApp:
         
         def thread():
             plan = self._get_plan(q)
-            self.root.after(0, lambda: self._handle(plan))
+            self.root.after(0, lambda: self._handle(plan, user_query=q))
         
         threading.Thread(target=thread, daemon=True).start()
     
-    def _handle(self, plan):
+    def _handle(self, plan, user_query: Optional[str] = None):
         self.ai_bar.set_enabled(True)
         self.ai_bar.set_status("")
         
@@ -888,16 +888,16 @@ class CLAIApp:
         self.terminal.log_ai(f"→ {plan.get('explain', cmd)}")
         
         if messagebox.askyesno("Execute?", f"Run: {cmd}"):
-            self._exec(plan)
+            self._exec(plan, user_query=user_query)
     
-    def _exec(self, plan):
+    def _exec(self, plan, user_query: Optional[str] = None):
         if not self.session:
             return
         
         self.terminal.log_cmd(" ".join(plan.get("command", [])))
         
         try:
-            result = self.session.run_plan(plan)
+            result = self.session.run_plan(plan, user_query=user_query)
             if result.stdout:
                 self.terminal.log_out(result.stdout)
             if result.stderr:
@@ -917,12 +917,37 @@ class CLAIApp:
         sb = self.session.get_sandbox_path()
         self.terminal.log_cmd(cmd)
         
+        import time
+        start_time = time.time()
+        
         try:
             result = subprocess.run(
                 f'cmd /c {cmd}' if os.name == 'nt' else cmd,
                 shell=True, cwd=str(sb),
                 capture_output=True, text=True, timeout=30
             )
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log the command execution
+            if hasattr(self.session, 'logger'):
+                plan_dict = {
+                    "version": "1.0",
+                    "intent": "terminal_command",
+                    "command": [cmd],
+                    "cwd": ".",
+                }
+                self.session.logger.log_command(
+                    user_query=f"Terminal command: {cmd}",
+                    plan=plan_dict,
+                    exit_code=result.returncode,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    duration_ms=duration_ms,
+                    sandbox_mode="sandbox",
+                    approved=True,
+                    error=result.stderr if result.returncode != 0 else None
+                )
             
             if result.stdout:
                 self.terminal.log_out(result.stdout)
@@ -935,8 +960,44 @@ class CLAIApp:
             self._update()
         except subprocess.TimeoutExpired:
             self.terminal.log("Timeout", "err")
+            if hasattr(self.session, 'logger'):
+                plan_dict = {
+                    "version": "1.0",
+                    "intent": "terminal_command",
+                    "command": [cmd],
+                    "cwd": ".",
+                }
+                self.session.logger.log_command(
+                    user_query=f"Terminal command: {cmd}",
+                    plan=plan_dict,
+                    exit_code=-1,
+                    stdout="",
+                    stderr="Command timed out after 30s",
+                    duration_ms=(time.time() - start_time) * 1000,
+                    sandbox_mode="sandbox",
+                    approved=True,
+                    error="Timeout"
+                )
         except Exception as e:
             self.terminal.log(f"Error: {e}", "err")
+            if hasattr(self.session, 'logger'):
+                plan_dict = {
+                    "version": "1.0",
+                    "intent": "terminal_command",
+                    "command": [cmd],
+                    "cwd": ".",
+                }
+                self.session.logger.log_command(
+                    user_query=f"Terminal command: {cmd}",
+                    plan=plan_dict,
+                    exit_code=-1,
+                    stdout="",
+                    stderr=str(e),
+                    duration_ms=(time.time() - start_time) * 1000,
+                    sandbox_mode="sandbox",
+                    approved=True,
+                    error=str(e)
+                )
     
     def run(self):
         self.root.update_idletasks()

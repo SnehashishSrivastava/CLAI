@@ -68,6 +68,16 @@ Complete documentation for the CLAI project.
 
 **Read this** to see CLAI in action.
 
+### [PRESENTATION.md](PRESENTATION.md) & [SLIDES.md](SLIDES.md)
+**Project presentation slides**
+- 15-slide comprehensive overview
+- Problem statement and solution
+- Architecture and components
+- Use cases and benefits
+- Future roadmap
+
+**Use these** for presentations and demos.
+
 ---
 
 ## 📝 Project Information
@@ -100,7 +110,9 @@ CLAI/
     ├── QUICKSTART.md      # Quick start guide
     ├── ARCHITECTURE.md    # System design
     ├── API.md             # API reference
-    └── EXAMPLES.md        # Usage examples
+    ├── EXAMPLES.md        # Usage examples
+    ├── PRESENTATION.md    # Detailed presentation (15 slides)
+    └── SLIDES.md          # Slide-friendly format
 ```
 
 ---

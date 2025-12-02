@@ -48,7 +48,7 @@ CLAI bridges the gap between natural language and command execution by:
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/SnehashishSrivastava/CLAI
    cd CLAI
    ```
 
@@ -732,11 +732,6 @@ All commands are logged to `CLAI_logs.txt` with:
 
 ---
 
-## 📄 License
-
-[Add your license here]
-
----
 
 ## 🙏 Acknowledgments
 
